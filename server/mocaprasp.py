@@ -1,45 +1,66 @@
-#!/usr/bin/env python3
-import os
-import pickle
-from datetime import datetime
-import click
+# tells the shell to use python 3 so you can run ./mocaprasp.py directly
+#!/usr/bin/env python3 
+# handles filesystem operaitions (making diretories, joining paths)
+import os 
 
-from mcr.capture.CEC import CEC
+# library for serializing and deserializing python objects 
+# serializing (pickling) is converting a python object into a byte stream to transport over the network
+# deserializing (unpickling)  converts byte stream back into pyton object
+import pickle 
+
+from datetime import datetime #library for getting timestamps
+
+# library for making command line tools
+# users use these tools by typing text commands into terminal to perform tasks
+import click 
+
+#import three classes from the mcr.capture package that run different MoCap processes
+#CEC = Camera Extrinsics Calibration
+from mcr.capture.CEC import CEC 
+#GPE = Ground Plane Estimation
 from mcr.capture.GPE import GPE
-from mcr.capture.SCR import SCR
+#SCR = Standard Capture Routine
+from mcr.capture.SCR import SCR 
 
 
-@click.group()
+@click.group() # command group
 def mocaprasp():
     """
     MoCap Rasp - Optical Tracking Arena\n\n
     Server script for the MoCap system at the Erobotica Lab, UFCG.\n
     Please use it together with the corresponding client script.
     """
-    pass
+    pass # function just organizes subcommands
 
 
-@click.command(name="cec")
+@click.command(name="cec") # subcommand
 @click.option(
     "--cameraids",
     "-c",
-    default="1,2,3",
+    default="1,2,3",# camera IDs
     help="List of active camera IDs (Default: 1,2,3)",
 )
 @click.option(
+    #number of relfective marker tracked
     "--markers", "-m", default=3, help="Number of expected markers (Default: 3)"
 )
 @click.option(
+    # small delay before recording starts
     "--trigger", "-t", default=10, help="Trigger time in seconds (Default: 10)"
 )
 @click.option(
+    #recording duration in seconds
     "--record", "-r", default=360, help="Recording time in seconds (Default: 360)"
 )
+#output data interpolation in frames per second
 @click.option("--fps", "-f", default=100, help="Interpolation FPS (Default: 100)")
+#shows deubbing and processing info
 @click.option(
     "--verbose", "-v", is_flag=True, help="Show ordering and interpolation verbosity"
 )
+#saves raw data to CSV files
 @click.option("--save", "-s", is_flag=True, help="Save received packages to CSV")
+#parameters for DBSCAN clustering algorithim (used for filtering noisy 3D points)
 @click.option("--dbscan-eps", default=0.01, help="DBSCAN epsilon for clustering")
 @click.option(
     "--dbscan-min-samples", default=10, help="DBSCAN minimum samples for clustering"
@@ -49,15 +70,17 @@ def mocaprasp():
     is_flag=True,
     help="Enable 3D clustering for consensus filtering",
 )
+#get new camera data
 @click.option(
     "--collect", is_flag=True, help="Run in collection mode only (no calibration)"
 )
+#load data into csv files and perform calibration
 @click.option(
     "--calibrate",
     type=click.Path(exists=True),
     help="Run in calibration-only mode using saved CSV file",
 )
-def cec(
+def cec(        # cec func parameters
     cameraids,
     markers,
     trigger,
@@ -71,13 +94,14 @@ def cec(
     collect,
     calibrate,
 ):
+    #user documentation
     """
     Camera Extrinsics Calibration
     Use either --collect or --calibrate:
     --collect    → Collect raw 2D data from cameras and save
     --calibrate  → Load CSV and compute extrinsics (no live capture)
     """
-
+    #ensures users chose one mode collect or calibrate not both and not none
     if collect and calibrate:
         click.echo("⚠️  You cannot specify both --collect and --calibrate.")
         click.echo("Example: python3 mocaprasp.py cec --collect")
@@ -88,7 +112,7 @@ def cec(
         click.echo("Example: python3 mocaprasp.py cec --collect")
         click.echo("         python3 mocaprasp.py cec --calibrate path/to/file.csv")
         return
-
+    # create a CEC object (the class that runs calibration)
     cecServer = CEC(
         cameraids,
         markers,
@@ -101,26 +125,27 @@ def cec(
         dbscan_min_samples,
         use_clustering,
     )
-
+    #collecting new data condition
     if collect:
-        cecServer.connect()
-        cecServer.collect()
+        cecServer.connect() # connect to cameras
+        cecServer.collect() # start gathering marker data
 
-        ymd, now = datetime.now().strftime("%y-%m-%d"), datetime.now().strftime(
+        ymd, now = datetime.now().strftime("%y-%m-%d"), datetime.now().strftime( # time stampts data
             "%H-%M-%S"
         )
-        out_dir = "debug/dataSaves/" + ymd + "/"
+        out_dir = "debug/dataSaves/" + ymd + "/" # saves entire cecServer object as a pickle file (.pkl)
         os.makedirs(out_dir, exist_ok=True)
         out_path = os.path.join(out_dir, f"CEC-{now}.pkl")
         with open(out_path, "wb") as f:
             pickle.dump(cecServer, f)
         click.echo(f"✅ CEC data saved to {out_path}")
-
+    #calibrating existing data
     if calibrate:
+        # load either a .pkl (pickle file) or .csv (raw camera data)
         if calibrate.endswith(".pkl"):
             with open(calibrate, "rb") as f:
                 cecServer = pickle.load(f)
-            cecServer.calibrate(datapath=None)
+            cecServer.calibrate(datapath=None) # compute extrinsic calibration (relative camera positions/orientations)
         elif calibrate.endswith(".csv"):
             cecServer = CEC(
                 cameraids,
@@ -134,7 +159,7 @@ def cec(
                 dbscan_min_samples,
                 use_clustering,
             )
-            cecServer.calibrate(datapath=calibrate)
+            cecServer.calibrate(datapath=calibrate) # compute extrinsic calibration
         else:
             click.echo("❌ Unsupported file type. Use .pkl or .csv")
         click.echo("✅ Camera extrinsics calibration completed.")
