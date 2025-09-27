@@ -33,7 +33,7 @@ def mocaprasp():
     pass # function just organizes subcommands
 
 
-@click.command(name="cec") # subcommand
+@click.command(name="cec") # camera extrinsics calibration subcommand
 @click.option(
     "--cameraids",
     "-c",
@@ -164,8 +164,8 @@ def cec(        # cec func parameters
             click.echo("❌ Unsupported file type. Use .pkl or .csv")
         click.echo("✅ Camera extrinsics calibration completed.")
 
-
-@click.command(name="gpe")
+# similart setting to cec subcommand
+@click.command(name="gpe") # group plane estimation subcommand
 @click.option(
     "--cameraids",
     "-c",
@@ -203,7 +203,7 @@ def gpe(cameraids, markers, trigger, record, fps, verbose, save, collect, estima
     --collect    → Collect raw 2D data from cameras and save
     --estimate   → Load CSV and compute ground plane (no live capture)
     """
-    if collect and estimate:
+    if collect and estimate: # can only perform data collection or estimation not both
         click.echo("❌ Cannot use --collect and --estimate together.")
         click.echo("Example: python3 mocaprasp.py gpe --collect")
         click.echo("         python3 mocaprasp.py gpe --estimate path/to/file.csv")
@@ -215,7 +215,7 @@ def gpe(cameraids, markers, trigger, record, fps, verbose, save, collect, estima
         return
 
     gpeServer = GPE(cameraids, markers, trigger, record, fps, verbose, save)
-
+    # collects and saves data
     if collect:
         gpeServer.connect()
         gpeServer.collect()
@@ -229,7 +229,7 @@ def gpe(cameraids, markers, trigger, record, fps, verbose, save, collect, estima
         with open(out_path, "wb") as f:
             pickle.dump(gpeServer, f)
         click.echo(f"✅ GPE data saved to {out_path}")
-
+    #peforms ground plane estimation fiven a .pkl or .csv file
     if estimate:
         if estimate.endswith(".pkl"):
             with open(estimate, "rb") as f:
@@ -243,7 +243,7 @@ def gpe(cameraids, markers, trigger, record, fps, verbose, save, collect, estima
         click.echo("✅ Ground plane estimation completed.")
 
 
-@click.command(name="scr")
+@click.command(name="scr") #standard capture routine subcommand
 @click.option(
     "--cameraids",
     "-c",
@@ -262,6 +262,7 @@ def gpe(cameraids, markers, trigger, record, fps, verbose, save, collect, estima
     "--verbose", "-v", is_flag=True, help="Show ordering and interpolation verbosity"
 )
 @click.option("--save", "-s", is_flag=True, help="Save received packages to CSV")
+#THE MAIN CAPTURE ROUTINE; used after calibration (CEC) and plane estimation (GPE)
 def scr(cameraids, markers, trigger, record, fps, verbose, save):
     """
     Standard Capture Routine\n\n
@@ -271,14 +272,27 @@ def scr(cameraids, markers, trigger, record, fps, verbose, save):
     - With CEC and GPE routines done, execute SCR as much as you like;\n\n
     Adjust the options to match your desired capture.
     """
+    # connect to cameras and peforms recording session
     scrServer = SCR(cameraids, markers, trigger, record, fps, verbose, save)
     scrServer.connect()
     scrServer.collect()
 
-
+# register subcommands to the mocaprasp command line interface group
 mocaprasp.add_command(cec)
 mocaprasp.add_command(scr)
 mocaprasp.add_command(gpe)
-
-if __name__ == "__main__":
+#SCRIPT ENTRY POINT
+if __name__ == "__main__": # runs command line interace when script is execute directly
     mocaprasp()
+#########
+
+#CEC#
+#teaches the system how the rasp cameras are arrange by mapping out the position/angle
+# -- collect runs a hort test and --calibrate uses the test to figure out the configuration
+#GPE#
+#tells the systems where the floor/ground is in the capture area
+# -- collect makes camrea record 3 marker places flat and --estimate figures out where the ground is in the 3d map
+#SCR#
+#captures real motion once setup is done
+# --record 60 tells the camrea to connect, wait a moment, then record for 60 seconds then the data is saved
+# data is a 3D recording
