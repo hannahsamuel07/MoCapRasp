@@ -285,6 +285,35 @@ mocaprasp.add_command(gpe)
 if __name__ == "__main__": # runs command line interace when script is execute directly
     mocaprasp()
 #########
+"""
+mocaprasp is the main control script for this motion capture system
+- its a remote control with 3 "buttons" that each do an action
+1. CEC tells the systems where the cameras are
+2. DPE tells the sytem were the floor is
+3. SCR starts recording motion
+- the script uses the click library to create these commands you can type in the terminal
+
+python3 mocaprasp.py cec --collect
+- tells the camera to record some sample data
+- saves that ray data to a .pkl file
+
+python3 mocaprasp.py cec --calibrate path/to/file.pkl
+- load file and runs math to figure out each camera's postiion and orientation
+- this teaches the camera to build 3D together
+
+python3 mocaprasp.py gpe --estimate path/to/file.pkl
+- figures out exactly where the floor is
+- this makes sure the 3D structurehas the right "up" and "flat" directions
+
+python3 mocaprasp.py scr --record 60 --fps 120
+- turns on cameras
+- waits for a trigger time
+- records for 60 seconds at 120 frames per sec
+-saves the data
+
+each command create a server obect
+"""
+
 
 #CEC#
 #teaches the system how the rasp cameras are arrange by mapping out the position/angle
@@ -296,3 +325,4 @@ if __name__ == "__main__": # runs command line interace when script is execute d
 #captures real motion once setup is done
 # --record 60 tells the camrea to connect, wait a moment, then record for 60 seconds then the data is saved
 # data is a 3D recording
+
