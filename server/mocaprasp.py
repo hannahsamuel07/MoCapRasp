@@ -320,9 +320,9 @@ each command create a server obect
 # -- collect runs a hort test and --calibrate uses the test to figure out the configuration
 #GPE#
 #tells the systems where the floor/ground is in the capture area
-# -- collect makes camrea record 3 marker places flat and --estimate figures out where the ground is in the 3d map
+# -- collect makes camera record 3 marker places flat and --estimate figures out where the ground is in the 3d map
 #SCR#
 #captures real motion once setup is done
-# --record 60 tells the camrea to connect, wait a moment, then record for 60 seconds then the data is saved
+# --record 60 tells the camera to connect, wait a moment, then record for 60 seconds then the data is saved
 # data is a 3D recording
 
