@@ -1,9 +1,12 @@
-# IMPORTS >>> DO NOT CHANGE <<<
-import warnings
-import socket, time
-import numpy as np
-from dataclasses import dataclass, field
+#Capture Process is the base infrastructure for a system that synchronizes multiple cameras, receives data form them, and prepares it for multi-camera calibration
 
+
+# IMPORTS >>> DO NOT CHANGE <<<
+import warnings #used to suppress warnings
+import socket, time #allows network communication between server and cameras, time used to schedule triggers and timestamps
+import numpy as np # library for math preparations and matrix handling
+from dataclasses import dataclass, field #helps define structure data containers
+#imports calibration constants like camera intrinsics and lens distortion coefficients
 from mcr.misc.constants import camera_matrix, distortion_coeff
 
 warnings.filterwarnings("ignore")
@@ -11,6 +14,8 @@ warnings.filterwarnings("ignore")
 
 @dataclass
 class CameraState:
+    #This Class holds per camera runtime data during image capture
+    #this tracks per camera capture performance and data quality
     """
     Holds per-camera state during capture, including frame counters, timestamps,
     undistorted marker coordinates, and certainty intervals for calibration.
@@ -67,22 +72,27 @@ class CalibrationResult:
 
 
 class CaptureProcess(object):
+    #This is the main controller that sets up the capture environment, connects to cameras, and triggers, them to start recording
     def __init__(
+        #internal setup
         self, cameraids, markers, trigger, record, fps, verbose, save, *args, **kwargs
     ):
         # VARIABLES >>> DO NOT CHANGE <<<
+        #splits the list of camera IDs and counts them
         self.cameraids = str(cameraids).split(",")
         self.cameras = len(self.cameraids)
         self.markers = markers
         self.triggerTime = trigger
         self.record = record
         self.fps = fps
+        #sets up timing parameters like time between frames
         self.step = 1 / fps
         self.verbose = verbose
         self.save = save
         self.ipList = []
 
         # IP lookup from hostname
+        # tries to resolve hostnames to their IP addresses, if not resolved, it exits
         try:
             self.ipList = [
                 socket.gethostbyname(f"cam{idx}.local") for idx in self.cameraids
@@ -90,11 +100,12 @@ class CaptureProcess(object):
         except socket.gaierror as e:
             print("[ERROR] Number of cameras do not match the number of IPs found")
             exit()
-
+        #each camera uses a copy of the intrinsics calibration constants (so the can be modified per camera if needed)
         self.camera_matrix = np.copy(camera_matrix)
         self.distortion_coeff = np.copy(distortion_coeff)
 
         # Do not change below this line, socket variables
+        # computes total number of frames and initializes placeholders for image sizes
         self.nImages = int(self.record / self.step)
         self.imageSize = []
 
@@ -102,7 +113,8 @@ class CaptureProcess(object):
             self.imageSize.append([])
 
         print("[INFO] Creating server")
-
+        # creates a UDP socket server that listens on part 8888
+        # this server waits for cameras clients to connect and send their metadata
         self.bufferSize = 1024
         self.server_socket = socket.socket(
             family=socket.AF_INET, type=socket.SOCK_DGRAM
@@ -114,6 +126,7 @@ class CaptureProcess(object):
         print("[INFO] Server running, waiting for clients")
 
         addedCams, ports = [], []
+        #waits until all expected cameras send their UDP message
         while len(addedCams) != self.cameras:
             # Collect addresses
             message, address = self.server_socket.recvfrom(self.bufferSize)
@@ -155,10 +168,12 @@ class CaptureProcess(object):
 
     # New intrinsics
     def intrinsics(self, origMatrix, w, h, mode):
+        #used to adjust camera intrinsic matrix depending on image resolution and crop mode
         camIntris = np.copy(origMatrix)  # Copy to avoid register error
 
         print(w, h, w / h, mode)
         # Check if image is at the available proportion
+        #eachmode here rescales or shifts parameters when camera's aspect ration or resolution changes
         if w / h == 4 / 3 or w / h == 16 / 9:
             if mode == 4:  # Only resize
                 ratio = w / 960
@@ -238,6 +253,13 @@ class CaptureProcess(object):
             print("[ERROR] Out of proportion of the camera mode")
             return False, camIntris
 
-    # This function is overriden at each custom capture process
+    # This function is overridden at each custom capture process
     def collect(self):
         pass
+#Capture Process Workflow:
+#instatiate captureProcess
+#it sets up the server and waits for camera connections
+#each camera sends metadata, and the server confirms them
+#he server sends a synchronized start trigger time
+#cameras begin recording
+#subclass overrides collect() to actually gather frames
